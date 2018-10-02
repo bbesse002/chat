@@ -5,10 +5,12 @@
 #include <netinet/ip.h>
 #include <unistd.h>
 #include <string.h>
+#include <errno.h>
+#include <netdb.h>
+#include <arpa/inet.h>
 
 
-
-#define Addr "127.0.0.1"
+#define local "127.0.0.1"
 #define Port 6666
 #define len 100
 
@@ -18,13 +20,19 @@ int main (int argc, char ** argv){
 
   int sock = socket( AF_INET, SOCK_STREAM, 0 );
 
-  struct sockaddr_in* mon_adresse = malloc (sizeof (struct sockaddr_in));
-  memset(mon_adresse, '\0', sizeof(struct sockaddr_in));
-  mon_adresse->sin_family = AF_INET;
-  mon_adresse->sin_port = htons(Port);
-  mon_adresse->sin_addr.s_addr = htonl(atoi(Addr));
+  struct sockaddr_in mon_adresse;
+  memset(&mon_adresse, '\0', sizeof(struct sockaddr_in));
 
-  int e = bind (sock, (struct sockaddr*)mon_adresse, sizeof(struct sockaddr_in));
+  struct in_addr a;
+  a.s_addr =inet_addr(local);
+
+
+
+  mon_adresse.sin_family = AF_INET;
+  mon_adresse.sin_port = htons(Port);
+  mon_adresse.sin_addr = a;
+
+  int e = bind (sock, (struct sockaddr*)&mon_adresse, sizeof(struct sockaddr_in));
   struct sockaddr addr;
   socklen_t addrlen;
   while (1){

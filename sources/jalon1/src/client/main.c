@@ -5,11 +5,14 @@
 #include <netinet/ip.h>
 #include <unistd.h>
 #include <string.h>
+#include <errno.h>
+#include <netdb.h>
+#include <arpa/inet.h>
 
 
 
-#define Addr "127.0.0.1"
-#define Port "6666"
+#define local "127.0.0.1"
+#define Port 6666
 #define len 100
 
 int main (int argc, char ** argv){
@@ -19,25 +22,32 @@ int main (int argc, char ** argv){
 
 
   int sock = socket( AF_INET, SOCK_STREAM, 0 );
-  struct sockaddr_in* sock_host = malloc (sizeof (struct sockaddr_in));
-  memset(sock_host, '\0', sizeof (struct sockaddr_in));
+  struct sockaddr_in sock_host;
+  memset(&sock_host, '\0', sizeof (struct sockaddr_in));
   if (sock == -1){
     printf ("erreur socket");
     perror ("socket");
+    return 0;
   }
 
-  sock_host->sin_family = AF_INET;
-  sock_host->sin_port = htons(atoi(Port));
-  sock_host->sin_addr.s_addr = htonl(atoi(Addr));
+  const char *IP= local;
 
 
-  int  connexion = connect (sock, (struct sockaddr*) sock_host, sizeof( struct sockaddr_in) );
+
+
+
+  sock_host.sin_family = AF_INET;
+  sock_host.sin_port = htons(Port);
+  sock_host.sin_addr.s_addr = inet_addr(IP);
+
+
+  int connexion = connect(sock,(struct sockaddr*)&sock_host,sizeof(sock_host));
   if (connexion == -1){
-    printf ("erreur de connexion\n");
-    perror("co");
+    perror("erreur de connexion\n");
+    return 0;
   }
 
-  while(1){
+  while (1){
 
     for (int i=0; i<100; i++){
       *(message+i)='0';
