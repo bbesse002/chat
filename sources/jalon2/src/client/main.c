@@ -11,15 +11,27 @@
 #include <poll.h>
 
 
-#define local "127.0.0.1"
-#define Port 6669
+
+
 #define len 100
+
 
 int main (int argc, char ** argv){
 
+  char q[6]="/quit";
+
+  if (argc!=3){
+    printf ("arguments");
+    return 0;
+  }
+
+  const char *IP =argv[1];
+  int Port = atoi(argv[2]);
+
+
   char message[len];
   char recu[len];
-
+  char test_b[2] = "0";
 
   int sock = socket( AF_INET, SOCK_STREAM, 0 );
   struct sockaddr_in sock_host;
@@ -30,7 +42,7 @@ int main (int argc, char ** argv){
     return 0;
   }
 
-  const char *IP= local;
+
 
 
 
@@ -46,6 +58,22 @@ int main (int argc, char ** argv){
     perror("erreur de connexion\n");
     return 0;
   }
+
+
+
+    printf ("1");
+    fflush(stdout);
+    recv(sock, test_b, 2, 0);
+
+
+  char t[2]="0";
+  if (strncmp(test_b,t,1) == 0){
+    printf("connexion refusée par le serveur");
+    fflush(stdout);
+    return 0;
+  }
+
+
 
   while (1){
 
@@ -66,14 +94,23 @@ int main (int argc, char ** argv){
 
     int len_rcv= recv ( sock, recu, len, 0);
 
-    printf ("serveur :\n");
-    for (int j=0; j<len_rcv; j++){
-      printf ("%c", *(recu+j));
+    if (strncmp(recu, q,5)==0){
+      printf ("connexion terminée\n");
+      return 0;
     }
-    printf ("\n");
+    else{
+      printf ("serveur :\n");
+      for (int j=0; j<len_rcv; j++){
+        printf ("%c", *(recu+j));
+      }
+      printf ("\n");
+    }
 
 
 
   }
   return 1;
 }
+
+
+/* pas de message quand connexion refusée //// quit ne libère pas une place sur le serveur
