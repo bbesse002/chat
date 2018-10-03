@@ -28,8 +28,11 @@ int main (int argc, char ** argv){
   struct sockaddr addr;
   socklen_t addrlen;
   while (1){
+
     int e2= listen (sock, 1);
+
     int e3= accept (sock, &addr, &addrlen);
+
     char buf[len];
 
 

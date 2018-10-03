@@ -31,7 +31,7 @@ int main (int argc, char ** argv){
   sock_host->sin_addr.s_addr = htonl(atoi(Addr));
 
 
-  int  connexion = connect (sock, (struct sockaddr*) sock_host, sizeof( struct sockaddr_in) );
+  int connexion = connect(sock,(struct sockaddr*)sock_host, sizeof(*sock_host));
   if (connexion == -1){
     printf ("erreur de connexion\n");
     perror("co");
