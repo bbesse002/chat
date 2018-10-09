@@ -14,13 +14,15 @@
 
 
 #define len 100
-#define n_co 2
+
 
 
 
 int main (int argc, char ** argv){
 
-  char  q[6]="/quit";
+  int co_max =20;
+
+  char  q[7]="/quit\n";
 
   if (argc!=3){
     printf ("arguments");
@@ -48,8 +50,8 @@ int main (int argc, char ** argv){
   socklen_t addrlen;
 
   int e2= listen (sock, 1);
-  struct pollfd fds[n_co];
-  for (int j=0; j<n_co;j++){
+  struct pollfd fds[co_max+1];
+  for (int j=0; j<co_max+1;j++){
     fds[j].fd = sock;
     fds[j].events = POLLIN;
   }
@@ -58,25 +60,25 @@ int main (int argc, char ** argv){
 
   while (1){
 
-    poll(fds,n_co,-1);
+    poll(fds,co_max+1,-1);
 
-    for (int i =0 ; i<k+1;i++){
+    for (int i =0 ; i<co_max+1;i++){
 
       if (fds[i].revents == POLLIN){
         if (fds[i].fd==sock){
 
-          if (k<n_co){
+          if (k<co_max){
             fds[i].fd=accept(sock, &addr, &addrlen);
-            int ls = send(fds[i].fd, "1",2,0);
+            int ls = send(fds[i].fd, "1\n",3,0);
             fds[i].events=POLLIN;
             k++;
             break;
           }
-
           else{
             int temp = accept(sock, &addr, &addrlen);
-            int ls = send(temp, "0", 2, 0);
+            int ls = send(temp, "0\n", 3, 0);
             close(temp);
+            break;
           }
         }
 
@@ -95,7 +97,7 @@ int main (int argc, char ** argv){
           printf ("\n");
           int e4 = send (fds[i].fd, &buf, size, 0);
 
-          if (strncmp(buf,q,5)==0){
+          if (strncmp(buf,q,7)==0){
             printf ("connexion avec un client fermée\n");
             fflush (stdout);
             close (fds[i].fd);
@@ -109,10 +111,6 @@ int main (int argc, char ** argv){
         }
       }
     }
-
-//    int newsock= accept (sock, &addr, &addrlen);
-
-
 
 
 

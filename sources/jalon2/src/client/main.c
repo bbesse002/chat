@@ -18,7 +18,7 @@
 
 int main (int argc, char ** argv){
 
-  char q[6]="/quit";
+  char q[]="/quit";
 
   if (argc!=3){
     printf ("arguments");
@@ -31,7 +31,7 @@ int main (int argc, char ** argv){
 
   char message[len];
   char recu[len];
-  char test_b[2] = "0";
+  char test_b[] = "0\n";
 
   int sock = socket( AF_INET, SOCK_STREAM, 0 );
   struct sockaddr_in sock_host;
@@ -61,14 +61,13 @@ int main (int argc, char ** argv){
 
 
 
-    printf ("1");
-    fflush(stdout);
-    recv(sock, test_b, 2, 0);
+
+    recv(sock, test_b, 3, 0);
 
 
-  char t[2]="0";
-  if (strncmp(test_b,t,1) == 0){
-    printf("connexion refusée par le serveur");
+  char t[]="0\n";
+  if (strcmp(test_b,t) == 0){
+    printf("connexion refusée par le serveur\n");
     fflush(stdout);
     return 0;
   }
@@ -111,6 +110,3 @@ int main (int argc, char ** argv){
   }
   return 1;
 }
-
-
-/* pas de message quand connexion refusée //// quit ne libère pas une place sur le serveur
