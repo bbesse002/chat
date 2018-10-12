@@ -20,29 +20,49 @@ struct thread_arg{
   char pseudo_envoi[22];
   int sock;
   volatile int b;
+  volatile int c;
 
 };
 
 void *envoi(struct thread_arg *arg){
   char message[len];
-  *(arg->pseudo+strlen(arg->pseudo)-1)='\0';
-  *(arg->pseudo_envoi+strlen(arg->pseudo_envoi)-1)='\0';
-  while(arg->b){
+
+  while (1){
+    if (arg->c){
+      free (arg);
+      void *a;
+      return a;
+    }
+    if(arg->b){
 
 
-    strcpy(message,"");
+      strcpy(message,"");
 
-    printf("message de %s pour %s (max 100 caractères)\n",arg->pseudo, arg->pseudo_envoi);
-    fflush(stdout);
-    fgets (message, len, stdin);
+      printf("message de %s pour %s (max 100 caractères)\n",arg->pseudo, arg->pseudo_envoi);
+      fflush(stdout);
+      fgets (message, len, stdin);
+      if (strcmp(message,"")!=0){
+        int l = strlen(message);
+        int len_sent = send ( arg->sock,message, l+1, 0);
 
-    int l = strlen(message);
+        if (strstr(message,"/quit")!=NULL){
+          free(arg);
+          exit;
+        }
+        else if (strncmp(message, "/nick", 5)==0){
+          arg->b=0;
+        }
+        else if (strncmp(message,"/connect",8)==0){
+          arg->b=0;
+        }
+        else if (strncmp(message,"/who",4)==0){
+          arg->b=0;
+        }
+      }
 
-
-
-    int len_sent = send ( arg->sock,message, l+1, 0);
+    }
   }
-  free(arg);
+
 }
 
 
@@ -140,6 +160,18 @@ int main (int argc, char ** argv){
     recv ( sock, liste, 500, 0);
   }
 
+  struct thread_arg *arg=malloc (sizeof(struct thread_arg));
+
+  strcpy(arg->pseudo,pseudo);
+  *(arg->pseudo+strlen(arg->pseudo)-1)='\0';
+  strcpy(arg->pseudo_envoi," ");
+  arg->sock=sock;
+  arg->b=0;
+  arg->c=0;
+
+  pthread_t th;
+  pthread_create(&th, NULL, (void *)envoi,arg);
+
   while (1){
 
     printf ("%s\n",liste);
@@ -166,14 +198,16 @@ int main (int argc, char ** argv){
     }
     printf ("%s\n",co_part);
     fflush(stdout);
-      struct thread_arg *arg=malloc (sizeof(struct thread_arg));
+
+
       strcpy(arg->pseudo,pseudo);
+      *(arg->pseudo+strlen(arg->pseudo)-1)='\0';
       strcpy(arg->pseudo_envoi,pseudo_envoi);
+      *(arg->pseudo_envoi+strlen(arg->pseudo_envoi)-1)='\0';
       arg->sock=sock;
       arg->b=1;
 
-    pthread_t th;
-    pthread_create(&th, NULL, (void *)envoi,arg);
+
 
     while (1){
 
@@ -185,35 +219,52 @@ int main (int argc, char ** argv){
       if (strstr(recu, q)!=NULL){
         printf ("connexion terminée\n");
         fflush(stdout);
-        void* ret;
-        arg->b=0;
-        pthread_exit( ret);
+        arg->c=1;
         return 0;
       }
       else if (strstr(recu, n)!=NULL){
-        void* ret;
         arg->b=0;
-        pthread_exit( ret);
         strcpy(liste," ");
         strcpy(co_part," ");
         strcpy(pseudo,(recu+6));
+        strcpy(arg->pseudo,(recu+6));
+        *(arg->pseudo+strlen(arg->pseudo)-1)='\0';
         break;
       }
       else if (strstr(recu,"personne de connecte pour le moment (envoyez un message pour rafaichir)\n")!=NULL){
-        void* ret;
         arg->b=0;
-        pthread_exit( ret);
         strcpy(liste," ");
         strcpy(co_part," ");
         break;
       }
       else if (strncmp(recu,w,4)==0){
-        void* ret;
+        printf("/connect pseudo pour changer d'interlocuteur\n/whois pseudo pour obtenir des informations\n%s",(recu+5));
+        arg->b=1;
+      }
+      else if(strncmp(recu,"/newhostname",12)==0){
+        printf ("%s devient %s\n",pseudo,(recu+13));
+        strcpy(pseudo_envoi,(recu+13));
+        strcpy(arg->pseudo_envoi,(recu+13));
+      }
+      else if(strstr(recu,"/hostlost")!=NULL){
         arg->b=0;
-        pthread_exit( ret);
-        strcpy(liste," ");
+        printf("connexion interrompue: envoyez un message pour rafraichir puis choisissez un contact :\n");
+        fflush(stdout);
+        strcpy(liste,recu+14);
         strcpy(co_part," ");
         break;
+      }
+      else if(strncmp(recu,"/new_host",9)==0){
+        printf("nouvelle connexion établie");
+        strcpy(pseudo_envoi,(recu+10));
+        strcpy(arg->pseudo_envoi,(recu+10));
+        arg->b=1;
+      }
+      else if(strncmp(recu,"/fail_new_host",14)==0){
+        printf ("utilisateur introuvable");
+
+
+        arg->b=1;
       }
       else{
         printf ("%s\n", recu);

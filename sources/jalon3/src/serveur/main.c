@@ -12,6 +12,7 @@
 #include <fcntl.h>
 
 #define len 100
+#define nb_co_max 20
 
 struct client{
   int i;
@@ -104,16 +105,38 @@ int supprimer_client (struct client* client0, int i){
   else return 0;
 }
 
-void liste_utilisateurs(struct client* client0,int i, char tmp[500]){
+void liste_utilisateurs(struct client* client0,int i, char tmp[500],int mode){
   struct client * client_actuel= client0->next;
-  strcpy(tmp, "choisissez un contact :\n");
-  if (client_actuel->next==NULL){
-    strcpy(tmp,"personne de connecte pour le moment (envoyez un message pour rafaichir)\n");
-    exit;
+  if (mode==0){
+    strcpy(tmp, "choisissez un contact :\n");
+    if (client_actuel->next==NULL){
+      strcpy(tmp,"personne de connecte pour le moment (envoyez un message pour rafaichir)\n");
+      exit;
+    }
+  }
+  else if (mode==1){
+    strcpy(tmp, "/who ");
+    if (client_actuel->next==NULL){
+      strcpy(tmp,"/who personne de connecte pour le moment (envoyez un message pour rafaichir)\n");
+      exit;
+    }
   }
   while (client_actuel != NULL){
     if (client_actuel->i !=i){
       strcat(tmp,client_actuel->pseudo);
+    }
+    client_actuel=client_actuel->next;
+  }
+}
+
+void trouver_client_com(struct client* client0,int i,struct client* tab[nb_co_max]){
+  int j=0;
+  struct client* client_concerne = trouver_client_indice(client0,i);
+  struct client* client_actuel = client0->next;
+  while(client_actuel!=NULL){
+    if (client_actuel->com != NULL && client_actuel->com->i==i){
+      tab[j]=client_actuel;
+      j++;
     }
     client_actuel=client_actuel->next;
   }
@@ -129,12 +152,13 @@ int main (int argc, char ** argv){
   client0->com = NULL;
 
 
-  int co_max =20;
+  int co_max =nb_co_max;
 
   char  q[]="/quit\n";
   char w[]="/who\n";
   char wi[]="/wois\n";
   char n[]="/nick";
+  char c[]="/connect";
 
 
   if (argc!=3){
@@ -203,6 +227,31 @@ int main (int argc, char ** argv){
 
           ssize_t size =  recv(fds[i].fd, buf, len ,0);
 
+
+          if (size==0){
+            struct client** av = malloc (20*sizeof(struct client));
+            printf("connexion avec un client perdue\n");
+            close (fds[i].fd);
+            k--;
+            trouver_client_com(client0,i,av);
+            supprimer_client(client0,i);
+            int j=0;
+            char host_lost[511];
+            strcpy(host_lost,"/hostlost ");
+            char tmp[500];
+            liste_utilisateurs(client0,i,tmp,1);
+            strcat(host_lost,tmp);
+            while (av[j]!=NULL){
+              av[j]->com=NULL;
+              send(fds[av[j]->i].fd, host_lost,10,0);
+              j++;
+            }
+            fds[i].fd = sock;
+            fds[i].events = POLLIN;
+            break;
+          }
+
+
           printf ("%d :\n",fds[i].fd);
           for (int j=0; j<size; j++){
             printf ("%c", *(buf+j));
@@ -210,30 +259,72 @@ int main (int argc, char ** argv){
           printf ("\n");
           fflush(stdout);
           if (strcmp(buf,q)==0){
+            struct client** av = malloc (20*sizeof(struct client));
             int e4 = send (fds[i].fd, buf, size, 0);
             printf ("connexion avec un client fermée\n");
             fflush (stdout);
-            supprimer_client(client0,i);
             close (fds[i].fd);
+            trouver_client_com(client0,i,av);
+            supprimer_client(client0,i);
             k--;
             fds[i].fd = sock;
             fds[i].events = POLLIN;
+            int j=0;
+            char tmp[500];
+            liste_utilisateurs(client0,i,tmp,1);
+            char host_lost[511];
+            strcpy(host_lost,"/hostlost ");
+            strcat(host_lost,tmp);
+            while (av[j]!=NULL){
+              av[j]->com=NULL;
+              send(fds[av[j]->i].fd, host_lost,511,0);
+              j++;
+            }
             break;
           }
+
           else if (strncmp(buf,n,5)==0){
             if (creer_client(client0,i,buf+6)==1){
+              struct client** av = malloc (20*sizeof(struct client));
+              printf("connexion avec un client perdue\n");
+              trouver_client_com(client0,i,av);
               char tmp[500];
-              liste_utilisateurs(client0,i,tmp);
+              liste_utilisateurs(client0,i,tmp,0);
               send (fds[i].fd, tmp, 500, 0);
+
+              char new[35];
+              strcpy(new,"/newhostname ");
+              strcat(new,buf+6);
+              int j=0;
+              while (av[j]!=NULL){
+                send(fds[av[j]->i].fd, new,36,0);
+                j++;
+              }
             }
+
+
             else{
               send (fds[i].fd, "entrez un pseudo valable", 17, 0);
             }
           }
-          else if (strcmp(buf,w)==0){
-            struct client* az = trouver_client_indice(client0,i);
-            az->com=NULL;
-            send (fds[i].fd, buf, 500, 0);
+          else if (strncmp(buf,c,8)==0){
+            struct client* correspondant = trouver_client(client0,buf+9);
+            if (correspondant !=NULL){
+              struct client* ptr = trouver_client_indice(client0,i);
+              ptr->com=correspondant;
+              char env[31];
+              strcpy(env,"/new_host");
+              strcat(env,buf+9);
+              send (fds[i].fd, env, 31, 0);
+            }
+            else{
+              send (fds[i].fd, "/fail_new_host", 15, 0);
+            }
+          }
+          else if(strncmp(buf,w,5)==0){
+            char tmp [500];
+            liste_utilisateurs(client0,i,tmp,1);
+            send (fds[i].fd, tmp, 500, 0);
           }
           else if (strcmp(buf,wi)==0){
 
@@ -242,7 +333,7 @@ int main (int argc, char ** argv){
             if (trouver_client_indice(client0,i)==NULL){
               if (creer_client(client0,i,buf)==1){
                 char tmp [500];
-                liste_utilisateurs(client0,i,tmp);
+                liste_utilisateurs(client0,i,tmp,0);
                 send (fds[i].fd, tmp, 500, 0);
               }
               else{
@@ -260,7 +351,7 @@ int main (int argc, char ** argv){
                 }
                 else{
                   char tmp [500];
-                  liste_utilisateurs(client0,i,tmp);
+                  liste_utilisateurs(client0,i,tmp,0);
                   send (fds[i].fd, tmp, 500, 0);
                 }
               }
