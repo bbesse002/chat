@@ -10,6 +10,7 @@
 #include <arpa/inet.h>
 #include <poll.h>
 #include <fcntl.h>
+#include <time.h>
 
 #define len 100
 #define nb_co_max 20
@@ -19,6 +20,7 @@ struct client{
   char pseudo[22];
   struct client* com;
   struct client* next;
+  struct tm instant;
 
 };
 
@@ -65,7 +67,6 @@ int creer_client (struct client* client0, int i, char* pseudo){
   struct client* a =trouver_client_indice(client0,i);
   if (a!=NULL){
     strcpy(a->pseudo,pseudo);
-    a->com=NULL;
     return 1;
   }
   else{
@@ -79,6 +80,9 @@ int creer_client (struct client* client0, int i, char* pseudo){
     client_actuel->i=i;
     client_actuel->com = NULL;
     strcpy(client_actuel->pseudo,pseudo);
+    time_t secondes;
+    time(&secondes);
+    client_actuel->instant=*gmtime(&secondes);
     return 1;
   }
 }
@@ -105,20 +109,23 @@ int supprimer_client (struct client* client0, int i){
   else return 0;
 }
 
-void liste_utilisateurs(struct client* client0,int i, char tmp[500],int mode){
+int liste_utilisateurs(struct client* client0,int i, char tmp[500],int mode){
   struct client * client_actuel= client0->next;
+  if (client_actuel ==NULL){
+    return 0;
+  }
   if (mode==0){
     strcpy(tmp, "choisissez un contact :\n");
     if (client_actuel->next==NULL){
       strcpy(tmp,"personne de connecte pour le moment (envoyez un message pour rafaichir)\n");
-      exit;
+      return 2;
     }
   }
-  else if (mode==1){
+  else{
     strcpy(tmp, "/who ");
     if (client_actuel->next==NULL){
       strcpy(tmp,"/who personne de connecte pour le moment (envoyez un message pour rafaichir)\n");
-      exit;
+      return 2;
     }
   }
   while (client_actuel != NULL){
@@ -127,6 +134,7 @@ void liste_utilisateurs(struct client* client0,int i, char tmp[500],int mode){
     }
     client_actuel=client_actuel->next;
   }
+  return 1;
 }
 
 void trouver_client_com(struct client* client0,int i,struct client* tab[nb_co_max]){
@@ -156,7 +164,7 @@ int main (int argc, char ** argv){
 
   char  q[]="/quit\n";
   char w[]="/who\n";
-  char wi[]="/wois\n";
+  char wi[]="/whois";
   char n[]="/nick";
   char c[]="/connect";
 
@@ -230,7 +238,6 @@ int main (int argc, char ** argv){
 
           if (size==0){
             struct client** av = malloc (20*sizeof(struct client));
-            printf("connexion avec un client perdue\n");
             close (fds[i].fd);
             k--;
             trouver_client_com(client0,i,av);
@@ -240,6 +247,7 @@ int main (int argc, char ** argv){
             strcpy(host_lost,"/hostlost ");
             char tmp[500];
             liste_utilisateurs(client0,i,tmp,1);
+            printf("connexion avec un client perdue\n");
             strcat(host_lost,tmp);
             while (av[j]!=NULL){
               av[j]->com=NULL;
@@ -286,11 +294,14 @@ int main (int argc, char ** argv){
           else if (strncmp(buf,n,5)==0){
             if (creer_client(client0,i,buf+6)==1){
               struct client** av = malloc (20*sizeof(struct client));
-              printf("connexion avec un client perdue\n");
+              for (int k=0;k<20;k++){
+                av[k]=NULL;
+              }
               trouver_client_com(client0,i,av);
-              char tmp[500];
-              liste_utilisateurs(client0,i,tmp,0);
-              send (fds[i].fd, tmp, 500, 0);
+              char tmp[27];
+              strcpy(tmp,"/nick");
+              strcat(tmp,buf+6);
+              send (fds[i].fd, tmp, 27, 0);
 
               char new[35];
               strcpy(new,"/newhostname ");
@@ -300,11 +311,12 @@ int main (int argc, char ** argv){
                 send(fds[av[j]->i].fd, new,36,0);
                 j++;
               }
+              break;
             }
 
 
             else{
-              send (fds[i].fd, "entrez un pseudo valable", 17, 0);
+              send (fds[i].fd, "/fail_pseudo", 13, 0);
             }
           }
           else if (strncmp(buf,c,8)==0){
@@ -313,7 +325,7 @@ int main (int argc, char ** argv){
               struct client* ptr = trouver_client_indice(client0,i);
               ptr->com=correspondant;
               char env[31];
-              strcpy(env,"/new_host");
+              strcpy(env,"/new_host ");
               strcat(env,buf+9);
               send (fds[i].fd, env, 31, 0);
             }
@@ -321,14 +333,58 @@ int main (int argc, char ** argv){
               send (fds[i].fd, "/fail_new_host", 15, 0);
             }
           }
-          else if(strncmp(buf,w,5)==0){
+
+
+
+
+
+          else if (strncmp(buf,wi,6)==0){
+            char host_name[21];
+            strcpy(host_name,buf+7);
+            struct client* host;
+            if ((host=trouver_client(client0,host_name))!=NULL){
+              struct sockaddr_in* host_data=malloc(sizeof(struct sockaddr_in));
+              socklen_t t=sizeof(struct sockaddr_in);
+              getpeername(fds[host->i].fd,(struct sockaddr *)host_data,&t);
+              int port_host = ntohs(host_data->sin_port);
+              char addr_host[50];
+              inet_ntop(AF_INET,&(host_data->sin_addr.s_addr),addr_host,50);
+              char tmp[500];
+              strcpy(tmp, "/whois ");
+              host_name[strlen(host_name)-1]='\0';
+              strcat(tmp,host_name);
+              tmp[sizeof(tmp)-1]='\n';
+              strcat(tmp," est connecté depuis le ");
+              char a[50];
+              sprintf(a,"%d/%d/%d %d:%d:%d ",host->instant.tm_mday,host->instant.tm_mon+1,host->instant.tm_year,host->instant.tm_hour+2,host->instant.tm_min,host->instant.tm_sec);
+              strcat(tmp,a);
+              strcat(tmp, "avec l'adresse ");
+              strcat(tmp,addr_host);
+              strcat(tmp," et le port ");
+              char a2[50];
+              sprintf(a2,"%d",port_host);
+              strcat(tmp,a2 );
+              send (fds[i].fd, tmp, 500, 0);
+            }
+            else{
+              send (fds[i].fd, "/fail_whois", 12, 0);
+            }
+            break;
+
+          }
+
+          else if(strncmp(buf,w,4)==0){
             char tmp [500];
             liste_utilisateurs(client0,i,tmp,1);
             send (fds[i].fd, tmp, 500, 0);
           }
-          else if (strcmp(buf,wi)==0){
 
-          }
+
+
+
+
+
+
           else{
             if (trouver_client_indice(client0,i)==NULL){
               if (creer_client(client0,i,buf)==1){
@@ -345,7 +401,7 @@ int main (int argc, char ** argv){
               struct client* ptr = trouver_client_indice(client0,i);
               if (ptr->com ==NULL){
                 struct client* correspondant = trouver_client(client0,buf);
-                if (correspondant !=NULL){
+                if ((correspondant !=NULL) && (correspondant->i != i)){
                   ptr->com=correspondant;
                   send (fds[i].fd, "/communication_etablie", 23, 0);
                 }

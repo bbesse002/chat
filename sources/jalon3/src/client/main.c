@@ -55,6 +55,9 @@ void *envoi(struct thread_arg *arg){
         else if (strncmp(message,"/connect",8)==0){
           arg->b=0;
         }
+        else if (strncmp(message,"/whois",6)==0){
+          arg->b=0;
+        }
         else if (strncmp(message,"/who",4)==0){
           arg->b=0;
         }
@@ -72,8 +75,8 @@ void *envoi(struct thread_arg *arg){
 int main (int argc, char ** argv){
 
   char  q[]="/quit\n";
-  char w[]="/who\n";
-  char wi[]="/wois";
+  char w[]="/who ";
+  char wi[]="/whois";
   char n[]="/nick";
 
   if (argc!=3){
@@ -175,6 +178,7 @@ int main (int argc, char ** argv){
   while (1){
 
     printf ("%s\n",liste);
+    fflush(stdout);
     fgets (pseudo_envoi, len, stdin);
     int l2 = strlen(pseudo_envoi);
     send ( sock, pseudo_envoi, l2+1, 0);
@@ -224,46 +228,64 @@ int main (int argc, char ** argv){
       }
       else if (strstr(recu, n)!=NULL){
         arg->b=0;
-        strcpy(liste," ");
-        strcpy(co_part," ");
-        strcpy(pseudo,(recu+6));
-        strcpy(arg->pseudo,(recu+6));
+        strcpy(pseudo,(recu+5));
+        strcpy(arg->pseudo,(recu+5));
         *(arg->pseudo+strlen(arg->pseudo)-1)='\0';
+//        recv(sock,recu,500,0);
+        arg->b=1;
+      }
+      else if (strncmp(recu,"personne de connecte pour le moment (envoyez un message pour rafraichir)",73)==0){
+        arg->b=0;
+        strcpy(liste,recu);
+        strcpy(co_part,liste);
         break;
       }
-      else if (strstr(recu,"personne de connecte pour le moment (envoyez un message pour rafaichir)\n")!=NULL){
-        arg->b=0;
-        strcpy(liste," ");
-        strcpy(co_part," ");
-        break;
+      else if (strncmp(recu,wi,6)==0){
+        printf("%s\n",recu+7);
+        recv(sock,recu,500,0);
+        arg->b=1;
       }
       else if (strncmp(recu,w,4)==0){
-        printf("/connect pseudo pour changer d'interlocuteur\n/whois pseudo pour obtenir des informations\n%s",(recu+5));
+        printf("\n/connect pseudo pour changer d'interlocuteur\n/whois pseudo pour obtenir des informations\n%s",(recu+5));
+        recv(sock,recu,500,0);
         arg->b=1;
       }
       else if(strncmp(recu,"/newhostname",12)==0){
-        printf ("%s devient %s\n",pseudo,(recu+13));
+        pseudo_envoi[strlen(pseudo_envoi)-1]='\0';
+        printf ("%s devient %s\n",pseudo_envoi,(recu+13));
         strcpy(pseudo_envoi,(recu+13));
         strcpy(arg->pseudo_envoi,(recu+13));
+        *(arg->pseudo_envoi+strlen(arg->pseudo_envoi)-1)='\0';
       }
       else if(strstr(recu,"/hostlost")!=NULL){
         arg->b=0;
         printf("connexion interrompue: envoyez un message pour rafraichir puis choisissez un contact :\n");
         fflush(stdout);
         strcpy(liste,recu+14);
-        strcpy(co_part," ");
+        strcpy(co_part,liste);
         break;
       }
       else if(strncmp(recu,"/new_host",9)==0){
-        printf("nouvelle connexion établie");
-        strcpy(pseudo_envoi,(recu+10));
-        strcpy(arg->pseudo_envoi,(recu+10));
+        printf("nouvelle connexion établie\n");
+        char tmp[21];
+        strcpy(tmp,recu+10);
+        tmp[strlen(tmp)-1]='\0';
+        strcpy(pseudo_envoi,tmp);
+        strcpy(arg->pseudo_envoi,tmp);
         arg->b=1;
       }
       else if(strncmp(recu,"/fail_new_host",14)==0){
-        printf ("utilisateur introuvable");
+        printf ("utilisateur introuvable\n");
 
 
+        arg->b=1;
+      }
+      else if(strncmp(recu,"/fail_pseudo",12)==0){
+        printf("pseudo non valable\n");
+        arg->b=1;
+      }
+      else if(strncmp(recu,"/fail_whois",11)==0){
+        printf("utilisateur introuvable\n");
         arg->b=1;
       }
       else{
