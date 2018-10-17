@@ -13,7 +13,7 @@
 #include <fcntl.h>
 
 
-#define len 100
+#define len 500
 
 struct thread_arg{
   char pseudo[22];
@@ -45,7 +45,6 @@ void *envoi(struct thread_arg *arg){
         int len_sent = send ( arg->sock,message, l+1, 0);
 
         if (strstr(message,"/quit")!=NULL){
-          free(arg);
           exit;
         }
         else if (strncmp(message, "/nick", 5)==0){
@@ -230,10 +229,9 @@ int main (int argc, char ** argv){
         strcpy(pseudo,(recu+5));
         strcpy(arg.pseudo,(recu+5));
         *(arg.pseudo+strlen(arg.pseudo)-1)='\0';
-//        recv(sock,recu,500,0);
         arg.b=1;
       }
-      else if (strncmp(recu,"personne de connecte pour le moment (envoyez un message pour rafraichir)",73)==0){
+      else if (strncmp(recu,"personne de connecte pour le moment",73)==0){
         arg.b=0;
         strcpy(liste,recu);
         strcpy(co_part,liste);
@@ -242,12 +240,10 @@ int main (int argc, char ** argv){
       else if (strncmp(recu,wi,6)==0){
         printf("%s\n",recu+7);
         fflush(stdout);
-        recv(sock,recu,500,0);
         arg.b=1;
       }
       else if (strncmp(recu,w,4)==0){
         printf("\n/connect pseudo pour changer d'interlocuteur\n/whois pseudo pour obtenir des informations\n%s",(recu+5));
-        recv(sock,recu,500,0);
         arg.b=1;
       }
       else if(strncmp(recu,"/newhostname",12)==0){
@@ -261,7 +257,7 @@ int main (int argc, char ** argv){
         arg.b=0;
         printf("connexion interrompue: envoyez un message pour rafraichir puis choisissez un contact :\n");
         fflush(stdout);
-        strcpy(liste,recu+14);
+        strcpy(liste,"");
         strcpy(co_part,liste);
         break;
       }
