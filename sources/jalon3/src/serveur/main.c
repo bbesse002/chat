@@ -174,8 +174,8 @@ int main (int argc, char ** argv){
     return 0;
   }
 
-  const char *IP =argv[1];
-  int Port = atoi(argv[2]);
+  const char *IP =argv[2];
+  int Port = atoi(argv[1]);
 
   int sock = socket( AF_INET, SOCK_STREAM, 0 );
 
