@@ -62,6 +62,12 @@ void *envoi(struct thread_arg *arg){
         else if (strncmp(message,"/msg ",5)==0){
           arg->b=0;
         }
+        else if (strncmp(message,"/create ",8)==0){
+          arg->b=0;
+        }
+        else if (strncmp(message, "/leave ",7)==0){
+          arg->b=0;
+        }
       }
 
     }
@@ -185,7 +191,6 @@ int main (int argc, char ** argv){
     send ( sock, pseudo_envoi, l2+1, 0);
     q1= recv ( sock, co_part, len, 0);
     while (strstr(co_part,"/communication_etablie")==NULL){
-      printf("caca\n");
       printf("%s",co_part);
       fflush(stdout);
       printf ("%s\n",co_part);
@@ -210,6 +215,15 @@ int main (int argc, char ** argv){
 
       strcpy(arg.pseudo,pseudo);
       *(arg.pseudo+strlen(arg.pseudo)-1)='\0';
+      if (strncmp(pseudo_envoi,"create ",7)==0){
+        *(pseudo_envoi)='(';
+        *(pseudo_envoi+1)='s';
+        *(pseudo_envoi+2)='a';
+        *(pseudo_envoi+3)='l';
+        *(pseudo_envoi+4)='o';
+        *(pseudo_envoi+5)='n';
+        *(pseudo_envoi+6)=')';
+      }
       strcpy(arg.pseudo_envoi,pseudo_envoi);
       *(arg.pseudo_envoi+strlen(arg.pseudo_envoi)-1)='\0';
       arg.sock=sock;
@@ -267,6 +281,21 @@ int main (int argc, char ** argv){
         strcpy(co_part,liste);
         break;
       }
+      else if(strncmp(recu,"/left ",6)==0){
+        arg.b=0;
+        printf("Salon quitté\n");
+        fflush(stdout);
+        char tmp[50];
+        strcpy(tmp,recu+6);
+        if (strstr(tmp,arg.pseudo_envoi)!=NULL){
+          printf("Entrer pour rafraichir\n");
+          fflush(stdout);
+          strcpy(liste,"");
+          strcpy(co_part,liste);
+          break;
+        }
+        arg.b=1;
+      }
       else if(strncmp(recu,"/new_host",9)==0){
         printf("nouvelle connexion établie\n");
         char tmp[21];
@@ -278,8 +307,11 @@ int main (int argc, char ** argv){
       }
       else if(strncmp(recu,"/fail_new_host",14)==0){
         printf ("utilisateur introuvable\n");
-
-
+        arg.b=1;
+      }
+      else if(strncmp(recu,"/fail_create",12)==0){
+        printf("impossible de créer ce salon\n");
+        fflush(stdout);
         arg.b=1;
       }
       else if(strncmp(recu,"/fail_pseudo",12)==0){

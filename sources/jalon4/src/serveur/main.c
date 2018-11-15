@@ -15,6 +15,11 @@
 #define len 1000
 #define nb_co_max 20
 
+struct serv{
+  int i;
+  struct serv* next;
+};
+
 struct client{
   int i;
   char pseudo[22];
@@ -22,6 +27,8 @@ struct client{
   struct client* next;
   struct tm instant;
   int count;
+  int mode;
+  struct serv* participant;
 
 };
 
@@ -62,6 +69,9 @@ struct client* trouver_client_indice(struct client* client0, int i){
 
 
 int creer_client (struct client* client0, int i, char* pseudo){
+  if (strlen(pseudo)>21){
+    return -1;
+  }
   if ((trouver_client(client0, pseudo) != NULL) || (strcmp(pseudo,"all\n")==0) || (strcmp(pseudo,"\n")==0)){
     return -1;
   }
@@ -93,9 +103,13 @@ int creer_client (struct client* client0, int i, char* pseudo){
     client_actuel->instant=*gmtime(&secondes);
     if (strncmp(pseudo,"(salon)",7)==0){
       client_actuel->count=1;
+      client_actuel->mode=1;
+      client_actuel->participant=NULL;
     }
     else{
       client_actuel->count=0;
+      client_actuel->mode=0;
+      client_actuel->participant =NULL;
     }
     return 1;
   }
@@ -118,6 +132,43 @@ int supprimer_client (struct client* client0, int i){
       client_actuel=client_actuel->next;
     }
     free(ptr);
+    struct client* client_actuel2 = client0->next;
+    while (client_actuel2!=NULL){
+      if (client_actuel2->mode==1){
+        struct serv* k = client_actuel2->participant;
+        while (k!= NULL && i==k->i){
+          client_actuel2->participant=k->next;
+          free(k);
+          k=client_actuel2->participant;
+          (client_actuel2->count)--;
+          if (client_actuel2->count==0){
+            struct client* temp=client_actuel2->next;
+            supprimer_client( client0,client_actuel2->i);
+            printf("un salon a été supprimé\n");
+            fflush(stdout);
+            client_actuel2=temp;
+            k=NULL;
+            break;
+          }
+        }
+        if (k !=NULL){
+          while (k->next!=NULL){
+            if (i==k->next->i){
+              struct serv *k2=k->next;
+              k->next=k->next->next;
+              free(k2);
+            }
+            else{
+              k=k->next;
+            }
+          }
+          client_actuel2=client_actuel2->next;
+        }
+      }
+      else{
+        client_actuel2=client_actuel2->next;
+      }
+    }
     return 1;
   }
   else return 0;
@@ -252,6 +303,9 @@ int main (int argc, char ** argv){
 
           if (size==0){
             struct client** av = malloc (20*sizeof(struct client));
+            for (int k=0;k<20;k++){
+              av[k]=NULL;
+            }
             close (fds[i].fd);
             k--;
             trouver_client_com(client0,i,av);
@@ -282,6 +336,9 @@ int main (int argc, char ** argv){
           fflush(stdout);
           if (strcmp(buf,q)==0){
             struct client** av = malloc (20*sizeof(struct client));
+            for (int k=0;k<20;k++){
+              av[k]=NULL;
+            }
             int e4 = send (fds[i].fd, buf, size, 0);
             printf ("connexion avec un client fermée\n");
             fflush (stdout);
@@ -304,7 +361,44 @@ int main (int argc, char ** argv){
             }
             break;
           }
-
+          else if (strncmp(buf,"/leave ",7)==0){
+            struct client* serveur= trouver_client(client0,buf+7);
+            char nom[50];
+            strcpy(nom,serveur->pseudo);
+            if (serveur!=NULL){
+              if (serveur->mode==1){
+                struct serv* w =serveur->participant;
+                while (w->next!=NULL){
+                  if (w->next->i==i){
+                    (serveur->count)--;
+                    struct serv* x=w->next;
+                    w->next=w->next->next;
+                    free(x);
+                    if (serveur->count==0){
+                      supprimer_client(client0,serveur->i);
+                      break;
+                    }
+                  }
+                  else{
+                    w=w->next;
+                  }
+                }
+                if (w->i==i){
+                  (serveur->count)--;
+                  struct serv* x=w->next;
+                  serveur->participant=w->next;
+                  if (serveur->count==0){
+                    supprimer_client(client0,serveur->i);
+                  }
+                  free(x);
+                }
+                char tmp[70];
+                strcpy(tmp,"/left ");
+                strcat(tmp,nom);
+                send(fds[i].fd, tmp,len,0);
+              }
+            }
+          }
           else if (strncmp(buf,n,5)==0){
             if (creer_client(client0,i,buf+6)==1){
               struct client** av = malloc (20*sizeof(struct client));
@@ -333,6 +427,29 @@ int main (int argc, char ** argv){
               send (fds[i].fd, "/fail_pseudo", 13, 0);
             }
           }
+          else if (strncmp(buf,"/join ",6)==0){
+            struct client* correspondant = trouver_client(client0,buf+6);
+            if (correspondant !=NULL){
+              struct client* ptr = trouver_client_indice(client0,i);
+              if (correspondant->mode==1){
+                (correspondant->count)++;
+                struct serv* z=correspondant->participant;
+                while (z->next!=NULL){
+                  if (z->i==i){
+                    break;
+                  }
+                  z=z->next;
+                }
+                printf("ok\n");
+                fflush(stdout);
+                if (z->i!=i){
+                  z->next=malloc(sizeof (struct serv));
+                  z->next->i=i;
+                  z->next->next=NULL;
+                }
+              }
+            }
+          }
           else if (strncmp(buf,c,8)==0){
             struct client* correspondant = trouver_client(client0,buf+9);
             if (correspondant !=NULL){
@@ -342,6 +459,23 @@ int main (int argc, char ** argv){
               strcpy(env,"/new_host ");
               strcat(env,buf+9);
               send (fds[i].fd, env, 31, 0);
+              if (correspondant->mode==1){
+                (correspondant->count)++;
+                struct serv* z=correspondant->participant;
+                while (z->next!=NULL){
+                  if(z->i==i){
+                    break;
+                  }
+                  z=z->next;
+                }
+                printf("ok\n");
+                fflush(stdout);
+                if (z->i!=i){
+                  z->next=malloc(sizeof (struct serv));
+                  z->next->i=i;
+                  z->next->next=NULL;
+                }
+              }
             }
             else if ((strcmp (buf+9,"all\n"))==0){
               struct client* ptr = trouver_client_indice(client0,i);
@@ -411,28 +545,43 @@ int main (int argc, char ** argv){
             strcpy(host_name,buf+7);
             struct client* host;
             if ((host=trouver_client(client0,host_name))!=NULL){
-              struct sockaddr_in* host_data=malloc(sizeof(struct sockaddr_in));
-              socklen_t t=sizeof(struct sockaddr_in);
-              getpeername(fds[host->i].fd,(struct sockaddr *)host_data,&t);
-              int port_host = ntohs(host_data->sin_port);
-              char addr_host[50];
-              inet_ntop(AF_INET,&(host_data->sin_addr.s_addr),addr_host,50);
-              char tmp[len];
-              strcpy(tmp, "/whois ");
-              host_name[strlen(host_name)-1]='\0';
-              strcat(tmp,host_name);
-              tmp[sizeof(tmp)-1]='\n';
-              strcat(tmp," est connecté depuis le ");
-              char a[50];
-              sprintf(a,"%d/%d/%d %d:%d:%d ",host->instant.tm_mday,host->instant.tm_mon+1,host->instant.tm_year,host->instant.tm_hour+2,host->instant.tm_min,host->instant.tm_sec);
-              strcat(tmp,a);
-              strcat(tmp, "avec l'adresse ");
-              strcat(tmp,addr_host);
-              strcat(tmp," et le port ");
-              char a2[50];
-              sprintf(a2,"%d",port_host);
-              strcat(tmp,a2 );
-              send (fds[i].fd, tmp, len, 0);
+              if (host->mode==0){
+                struct sockaddr_in* host_data=malloc(sizeof(struct sockaddr_in));
+                socklen_t t=sizeof(struct sockaddr_in);
+                getpeername(fds[host->i].fd,(struct sockaddr *)host_data,&t);
+                int port_host = ntohs(host_data->sin_port);
+                char addr_host[50];
+                inet_ntop(AF_INET,&(host_data->sin_addr.s_addr),addr_host,50);
+                char tmp[len];
+                strcpy(tmp, "/whois ");
+                host_name[strlen(host_name)-1]='\0';
+                strcat(tmp,host_name);
+                tmp[sizeof(tmp)-1]='\n';
+                strcat(tmp," est connecté depuis le ");
+                char a[50];
+                sprintf(a,"%d/%d/%d %d:%d:%d ",host->instant.tm_mday,host->instant.tm_mon+1,host->instant.tm_year,host->instant.tm_hour+2,host->instant.tm_min,host->instant.tm_sec);
+                strcat(tmp,a);
+                strcat(tmp, "avec l'adresse ");
+                strcat(tmp,addr_host);
+                strcat(tmp," et le port ");
+                char a2[50];
+                sprintf(a2,"%d",port_host);
+                strcat(tmp,a2 );
+                send (fds[i].fd, tmp, len, 0);
+              }
+              else{
+                char presents[1000];
+                struct serv *la=host->participant;
+                strcpy(presents,"/whois Sont connectés à ce serveur :\n");
+                while(la!=NULL){
+                  struct client* w=trouver_client_indice(client0,la->i);
+                  strcat(presents,w->pseudo);
+                  presents[strlen(presents)-1]='\n';
+                  presents[strlen(presents)]='\0';
+                  la=la->next;
+                }
+                send (fds[i].fd, presents, len, 0);
+              }
             }
             else{
               send (fds[i].fd, "/fail_whois", 12, 0);
@@ -440,17 +589,31 @@ int main (int argc, char ** argv){
             break;
 
           }
+          else if (strncmp(buf,"/create ",8)==0){
+            char name[28];
+            strcpy(name,"(salon)");
+            strcat(name,buf+8);
+            if (creer_client(client0,-1,name)==1){
+              struct client* ptr=trouver_client_indice(client0,i);
+              ptr->com=trouver_client(client0,name);
+              ptr->com->participant=malloc(sizeof(struct serv));
+              ptr->com->participant->i=i;
+              ptr->com->participant->next=NULL;
+              char tmp[50];
+              strcpy(tmp,"/new_host (salon)");
+              strcat(tmp,buf+8);
+              send (fds[i].fd, tmp, 23, 0);
+            }
+            else{
+              send (fds[i].fd, "/fail_create", len, 0);
+            }
+          }
 
           else if(strncmp(buf,w,4)==0){
             char tmp [len];
             liste_utilisateurs(client0,i,tmp,1);
             send (fds[i].fd, tmp, len, 0);
           }
-
-
-
-
-
 
 
           else{
@@ -472,6 +635,23 @@ int main (int argc, char ** argv){
                 if ((correspondant !=NULL) && (correspondant->i != i)){
                   ptr->com=correspondant;
                   send (fds[i].fd, "/communication_etablie", 23, 0);
+                  if (correspondant->mode==1){
+                    (correspondant->count)++;
+                    struct serv* z=correspondant->participant;
+                    while (z->next!=NULL){
+                      if (z->i==i){
+                        break;
+                      }
+                      z=z->next;
+                    }
+                    printf("ok\n");
+                    fflush(stdout);
+                    if (z->i!=i){
+                      z->next=malloc(sizeof (struct serv));
+                      z->next->i=i;
+                      z->next->next=NULL;
+                    }
+                  }
                 }
                 else if(strcmp(buf,"all\n")==0){
                   ptr->com=client0;
@@ -483,6 +663,9 @@ int main (int argc, char ** argv){
                   strcat(name,buf+7);
                   if (creer_client(client0,-1,name)==1){
                     ptr->com=trouver_client(client0,name);
+                    ptr->com->participant=malloc(sizeof(struct serv));
+                    ptr->com->participant->i=i;
+                    ptr->com->participant->next=NULL;
                     send (fds[i].fd, "/communication_etablie", 23, 0);
                   }
                   else{
@@ -515,13 +698,10 @@ int main (int argc, char ** argv){
                   }
                 }
                 send (fds[ptr->com->i].fd, &msg, size+22, 0);
-
               }
               break;
             }
-
           }
-
         }
       }
     }
