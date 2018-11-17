@@ -399,6 +399,78 @@ int main (int argc, char ** argv){
               }
             }
           }
+          else if (strncmp(buf,"/send ",6)==0){
+            char name[21];
+            char file[50];
+            int j=0;
+            while (*(buf+6+j)!=' ' && *(buf+6+j)!='\0'){
+              j++;
+            }
+            if (*(buf+6+j)==' '){
+              for (int i=0;i<j;i++){
+                name[i]=buf[i+6];
+              }
+              name[j]='\n';
+              name[j+1]='\0';
+              int k=j+1;
+              while (*(buf+6+k)!=' ' && *(buf+6+k)!='\0'){
+                k++;
+              }
+              if (*(buf+6+k)=='\0'){
+                for (int i=j+1;i<k;i++){
+                  file[i-j-1]=buf[i+6];
+                }
+                file[k-j-2]='\0';
+                struct client * c= trouver_client(client0,name);
+                if (c!=NULL){
+                  char msg[100];
+                  strcpy(msg,"/send ");
+                  strcat(msg,(trouver_client_indice(client0,i)->pseudo));
+                  strcat(msg," ");
+                  strcat(msg,file);
+                  send(fds[c->i].fd,msg,100,0);
+                  send(fds[i].fd,"/ok",4,0);
+                  break;
+                }
+              }
+            }
+            send(fds[i].fd,"/pasok",7,0);
+          }
+          else if (strncmp(buf,"/accept ",8)==0){
+            char name[21];
+            char file[50];
+            int j=0;
+            while (*(buf+8+j)!=' ' && *(buf+8+j)!='\0'){
+              j++;
+            }
+            if (*(buf+8+j)==' '){
+              for (int i=0;i<j;i++){
+                name[i]=buf[i+8];
+              }
+              name[j]='\n';
+              name[j+1]='\0';
+              int k=j+1;
+              while (*(buf+8+k)!=' ' && *(buf+8+k)!='\0'){
+                k++;
+              }
+              if (*(buf+8+k)==' '){
+                for (int i=j+1;i<k;i++){
+                  file[i-j-1]=buf[i+8];
+                }
+                file[k-j-2]='\0';
+                char msg[100];
+                strcpy(msg,"/accept ");
+                strcat(msg,trouver_client_indice(client0,i)->pseudo);
+                strcat(msg," ");
+                strcat(msg,file);
+                strcat(msg,buf+8+k);
+                struct client* c=trouver_client(client0,name);
+                if (c!=NULL){
+                  send(fds[c->i].fd,msg,100,0);
+                }
+              }
+            }
+          }
           else if (strncmp(buf,n,5)==0){
             if (creer_client(client0,i,buf+6)==1){
               struct client** av = malloc (20*sizeof(struct client));

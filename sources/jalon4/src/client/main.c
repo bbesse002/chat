@@ -24,6 +24,25 @@ struct thread_arg{
 
 };
 
+struct send_file{
+  int file;
+  char add[50];
+  int port;
+  struct send_file* next;
+};
+
+struct rcv_file{
+  char name[50];
+};
+
+void *s_file(struct send_file *arg){
+
+}
+
+void *r_file(struct rcv_file *arg){
+
+}
+
 void *envoi(struct thread_arg *arg){
   char message[len];
 
@@ -184,11 +203,18 @@ int main (int argc, char ** argv){
 
   while (1){
 
-    printf ("%s\n",liste);
-    fflush(stdout);
-    fgets (pseudo_envoi, len, stdin);
-    int l2 = strlen(pseudo_envoi);
+//    printf ("%s\n",liste);
+//    fflush(stdout);
+//    fgets (pseudo_envoi, len, stdin);
+//    int l2 = strlen(pseudo_envoi);
+//
+    strcpy(pseudo_envoi,"all\n");
+    int l2= 5;
+//
+//
+
     send ( sock, pseudo_envoi, l2+1, 0);
+
     q1= recv ( sock, co_part, len, 0);
     while (strstr(co_part,"/communication_etablie")==NULL){
       printf("%s",co_part);
@@ -209,8 +235,8 @@ int main (int argc, char ** argv){
       send ( sock, pseudo_envoi, l2+1, 0);
       recv ( sock, co_part, len, 0);
     }
-    printf ("%s\n",co_part);
-    fflush(stdout);
+//    printf ("%s\n",co_part);
+//    fflush(stdout);
 
 
       strcpy(arg.pseudo,pseudo);
