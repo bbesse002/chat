@@ -204,7 +204,7 @@ int liste_utilisateurs(struct client* client0,int i, char tmp[len],int mode){
 
 void trouver_client_com(struct client* client0,int i,struct client* tab[nb_co_max]){
   int j=0;
-  struct client* client_concerne = trouver_client_indice(client0,i);
+//  struct client* client_concerne = trouver_client_indice(client0,i);
   struct client* client_actuel = client0->next;
   while(client_actuel!=NULL){
     if (client_actuel->com != NULL && client_actuel->com->i==i){
@@ -255,11 +255,11 @@ int main (int argc, char ** argv){
   mon_adresse.sin_port = htons(Port);
   mon_adresse.sin_addr.s_addr = inet_addr(IP);
 
-  int e = bind (sock, (struct sockaddr*)&mon_adresse, sizeof(struct sockaddr_in));
+  bind (sock, (struct sockaddr*)&mon_adresse, sizeof(struct sockaddr_in));
   struct sockaddr addr;
   socklen_t addrlen;
 
-  int e2= listen (sock, 1);
+  listen (sock, 1);
   struct pollfd fds[co_max+1];
   for (int j=0; j<co_max+1;j++){
     fds[j].fd = sock;
@@ -279,14 +279,14 @@ int main (int argc, char ** argv){
 
           if (k<co_max){
             fds[i].fd=accept(sock, &addr, &addrlen);
-            int ls = send(fds[i].fd, "1",2,0);
+            send(fds[i].fd, "1",2,0);
             fds[i].events=POLLIN;
             k++;
             break;
           }
           else{
             int temp = accept(sock, &addr, &addrlen);
-            int ls = send(temp, "0", 2, 0);
+            send(temp, "0", 2, 0);
             close(temp);
             break;
           }
@@ -339,7 +339,7 @@ int main (int argc, char ** argv){
             for (int k=0;k<20;k++){
               av[k]=NULL;
             }
-            int e4 = send (fds[i].fd, buf, size, 0);
+            send (fds[i].fd, buf, size, 0);
             printf ("connexion avec un client fermée\n");
             fflush (stdout);
             close (fds[i].fd);
@@ -502,7 +502,7 @@ int main (int argc, char ** argv){
           else if (strncmp(buf,"/join ",6)==0){
             struct client* correspondant = trouver_client(client0,buf+6);
             if (correspondant !=NULL){
-              struct client* ptr = trouver_client_indice(client0,i);
+              //struct client* ptr = trouver_client_indice(client0,i);
               if (correspondant->mode==1){
                 (correspondant->count)++;
                 struct serv* z=correspondant->participant;
@@ -647,7 +647,7 @@ int main (int argc, char ** argv){
                 tmp[sizeof(tmp)-1]='\n';
                 strcat(tmp," est connecté depuis le ");
                 char a[50];
-                sprintf(a,"%d/%d/%d %d:%d:%d ",host->instant.tm_mday,host->instant.tm_mon+1,host->instant.tm_year,host->instant.tm_hour+2,host->instant.tm_min,host->instant.tm_sec);
+                sprintf(a,"%d/%d/%d %d:%d:%d ",host->instant.tm_mday,host->instant.tm_mon+1,host->instant.tm_year+1900,host->instant.tm_hour+1,host->instant.tm_min,host->instant.tm_sec);
                 strcat(tmp,a);
                 strcat(tmp, "avec l'adresse ");
                 strcat(tmp,addr_host);

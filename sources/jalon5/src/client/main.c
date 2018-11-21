@@ -27,7 +27,7 @@ struct file{
   int file;
   char name[50];
   struct personnes* first;
-  volatile struct file* next;
+  struct file* next;
 };
 
 struct send_file{
@@ -56,7 +56,7 @@ struct thread_arg{
 
 };
 
-
+//thread d'envoi de fichier (connect au client distant puis envoi du fichier)
 void *s_file(struct send_file *arg){
   char msg[1024];
   while(1){
@@ -72,7 +72,7 @@ void *s_file(struct send_file *arg){
       sock_host.sin_family = AF_INET;
       sock_host.sin_port = htons(arg->next->port);
       sock_host.sin_addr.s_addr = inet_addr(arg->next->add);
-      int connexion = connect(sock,(struct sockaddr*)&sock_host,sizeof(sock_host));
+      connect(sock,(struct sockaddr*)&sock_host,sizeof(sock_host));
       strcpy(msg,arg->next->name);
       char aa[2];
       send(sock,msg,1023,0);
@@ -95,6 +95,7 @@ void *s_file(struct send_file *arg){
   }
 }
 
+//thread de reception de fichier (accept jusqu'a ce qu'un client s'y connecte et envoie un fichier)
 void *r_file(struct rcv_file* arg){
 
   int sock = socket( AF_INET, SOCK_STREAM, 0 );
@@ -200,7 +201,7 @@ void *envoi(struct thread_arg *arg){
                     printf("demande d'envoi de %s à %s",file,name);
                     fflush(stdout);
                     arg->b=0;
-                    int len_sent = send ( arg->sock,message, l+1, 0);
+                    send ( arg->sock,message, l+1, 0);
 
                   }
                 }
@@ -246,7 +247,7 @@ void *envoi(struct thread_arg *arg){
                       printf("demande d'envoi de %s à %s",file,name);
                       fflush(stdout);
                       arg->b=0;
-                      int len_sent = send ( arg->sock,message, l+1, 0);
+                      send ( arg->sock,message, l+1, 0);
                     }
                   }
                   else{
@@ -285,7 +286,7 @@ void *envoi(struct thread_arg *arg){
                   else{
                     printf("demande d'envoi de %s à %s",file,name);
                     fflush(stdout);
-                    int len_sent = send ( arg->sock,message, l+1, 0);
+                    send ( arg->sock,message, l+1, 0);
                     arg->b=0;
                   }
                 }
@@ -300,15 +301,15 @@ void *envoi(struct thread_arg *arg){
           strcat(message,(pp));
           strcat(message," ");
           strcat(message,(arg->argv)[2]);
-          int len_sent = send ( arg->sock,message, l+50, 0);
+          send ( arg->sock,message, l+50, 0);
         }
         else{
-          int len_sent = send ( arg->sock,message, l+1, 0);
+          send ( arg->sock,message, l+1, 0);
 
-          if (strstr(message,"/quit")!=NULL){
+/*          if (strstr(message,"/quit")!=NULL){
             exit;
-          }
-          else if (strncmp(message, "/nick", 5)==0){
+          }*/
+          if (strncmp(message, "/nick", 5)==0){
             arg->b=0;
           }
           else if (strncmp(message,"/connect",8)==0){
@@ -343,21 +344,17 @@ void *envoi(struct thread_arg *arg){
 
 int main (int argc, char ** argv){
 
+// Initialisation des variables
   char  q[]="/quit\n";
   char w[]="/who ";
   char wi[]="/whois";
   char n[]="/nick";
-
   if (argc!=3){
     printf ("arguments");
     return 0;
   }
-
   const char *IP =argv[2];
   int Port = atoi(argv[1]);
-
-
-
   char recu[len];
   char pseudo[22];
   char liste[len];
@@ -365,10 +362,9 @@ int main (int argc, char ** argv){
   char pseudo_envoi[29];
   char co_part[len];
   char t[]="0";
-  int q1=0;
-  int flags;
+//  int q1=0;
+//  int flags;
   int port_rd;
-
   struct send_file *jalon5=malloc(sizeof(struct rcv_file));
   jalon5->next=NULL;
   jalon5->file=0;
@@ -381,13 +377,14 @@ int main (int argc, char ** argv){
   jalon5r->portrd=&port_rd;
   struct file *file=NULL;
 
+// threads
   pthread_t th1;
   pthread_create(&th1, NULL, (void *)s_file,jalon5);
 
   pthread_t th2;
   pthread_create(&th2, NULL, (void *)r_file,jalon5r);
 
-
+//creation de socket
   int sock = socket( AF_INET, SOCK_STREAM, 0 );
   struct sockaddr_in sock_host;
   memset(&sock_host, '\0', sizeof (struct sockaddr_in));
@@ -397,14 +394,11 @@ int main (int argc, char ** argv){
     return 0;
   }
 
-  struct pollfd fds[1];
-    fds[0].fd = sock;
-    fds[0].events = POLLIN;
 
 
 
 
-
+//connexion au serveur
   sock_host.sin_family = AF_INET;
   sock_host.sin_port = htons(Port);
   sock_host.sin_addr.s_addr = inet_addr(IP);
@@ -421,7 +415,7 @@ int main (int argc, char ** argv){
   }
 
 
-
+//test de connexion
 
   recv(sock, test_b, 2, 0);
 
@@ -435,7 +429,7 @@ int main (int argc, char ** argv){
 
 
 
-
+//choix du pseudo
   strcpy(liste," ");
   strcpy(co_part," ");
 
@@ -452,6 +446,8 @@ int main (int argc, char ** argv){
     recv ( sock, liste, len, 0);
   }
 
+
+//creation du dernier thread
   struct thread_arg arg;
 
   strcpy(arg.pseudo,pseudo);
@@ -469,6 +465,10 @@ int main (int argc, char ** argv){
 
   while (1){
 
+
+
+// (OPTION MISE DE COTE, REMPLACEE PAR "ALL")
+
 //    printf ("%s\n",liste);
 //    fflush(stdout);
 //    fgets (pseudo_envoi, len, stdin);
@@ -481,61 +481,64 @@ int main (int argc, char ** argv){
 
     send ( sock, pseudo_envoi, l2+1, 0);
 
-    q1= recv ( sock, co_part, len, 0);
-    while (strstr(co_part,"/communication_etablie")==NULL){
-      printf("%s",co_part);
-      fflush(stdout);
-      printf ("%s\n",co_part);
-      poll(fds,1,1);
-      while (fds[0].revents==POLLIN){
-        recv ( sock, &co_part, len, 0);
-        printf ("%s\n",co_part);
-        fflush(stdout);
-        poll(fds,1,1);
-      }
-      fflush(stdout);
-      fflush(stdin);
-      fgets (pseudo_envoi, len, stdin);
-      fflush(stdin);
-      l2 = strlen(pseudo_envoi);
-      send ( sock, pseudo_envoi, l2+1, 0);
-      recv ( sock, co_part, len, 0);
-    }
+    recv ( sock, co_part, len, 0);
+    // while (strstr(co_part,"/communication_etablie")==NULL){
+    //   printf("%s",co_part);
+    //   fflush(stdout);
+    //   printf ("%s\n",co_part);
+    //   poll(fds,1,1);
+    //   while (fds[0].revents==POLLIN){
+    //     recv ( sock, &co_part, len, 0);
+    //     printf ("%s\n",co_part);
+    //     fflush(stdout);
+    //     poll(fds,1,1);
+    //   }
+    //   fflush(stdout);
+    //   fflush(stdin);
+    //   fgets (pseudo_envoi, len, stdin);
+    //   fflush(stdin);
+    //   l2 = strlen(pseudo_envoi);
+    //   send ( sock, pseudo_envoi, l2+1, 0);
+    //   recv ( sock, co_part, len, 0);
+    // }
 //    printf ("%s\n",co_part);
 //    fflush(stdout);
 
 
       strcpy(arg.pseudo,pseudo);
       *(arg.pseudo+strlen(arg.pseudo)-1)='\0';
-      if (strncmp(pseudo_envoi,"create ",7)==0){
-        *(pseudo_envoi)='(';
-        *(pseudo_envoi+1)='s';
-        *(pseudo_envoi+2)='a';
-        *(pseudo_envoi+3)='l';
-        *(pseudo_envoi+4)='o';
-        *(pseudo_envoi+5)='n';
-        *(pseudo_envoi+6)=')';
-      }
+      // if (strncmp(pseudo_envoi,"create ",7)==0){
+      //   *(pseudo_envoi)='(';
+      //   *(pseudo_envoi+1)='s';
+      //   *(pseudo_envoi+2)='a';
+      //   *(pseudo_envoi+3)='l';
+      //   *(pseudo_envoi+4)='o';
+      //   *(pseudo_envoi+5)='n';
+      //   *(pseudo_envoi+6)=')';
+      // }
       strcpy(arg.pseudo_envoi,pseudo_envoi);
       *(arg.pseudo_envoi+strlen(arg.pseudo_envoi)-1)='\0';
       arg.sock=sock;
       arg.b=1;
 
 
-
+//boucle de réception
     while (1){
 
       strcpy(recu,"");
 
 
-      int len_rcv= recv ( sock, recu, len, 0);
+      recv ( sock, recu, len, 0);
 
+//reception d'un ack de déco
       if (strstr(recu, q)!=NULL){
         printf ("connexion terminée\n");
         fflush(stdout);
         arg.c=1;
         return 0;
       }
+
+//Ack de changement de pseudo
       else if (strstr(recu, n)!=NULL){
         arg.b=0;
         strcpy(pseudo,(recu+5));
@@ -543,21 +546,29 @@ int main (int argc, char ** argv){
         *(arg.pseudo+strlen(arg.pseudo)-1)='\0';
         arg.b=1;
       }
+
+//Ack
       else if (strncmp(recu,"personne de connecte pour le moment",73)==0){
         arg.b=0;
         strcpy(liste,recu);
         strcpy(co_part,liste);
-        break;
+        send(sock,"/connect all\n",15,0);
       }
+
+//Afficher résultat du whois
       else if (strncmp(recu,wi,6)==0){
         printf("%s\n",recu+7);
         fflush(stdout);
         arg.b=1;
       }
+
+//Afficher résultat du who
       else if (strncmp(recu,w,4)==0){
-        printf("\n/connect pseudo pour changer d'interlocuteur\n/whois pseudo pour obtenir des informations\n%s",(recu+5));
+        printf("\n/connect pseudo pour changer d'interlocuteur\n/whois pseudo pour obtenir des informations\n/join pour rejoindre un salon\n/send pseudo fichier pour envoyer un fichier\n%s",(recu+5));
         arg.b=1;
       }
+
+//Avertissement de changement de nom d'une personne
       else if(strncmp(recu,"/newhostname",12)==0){
         pseudo_envoi[strlen(pseudo_envoi)-1]='\0';
         printf ("%s devient %s\n",pseudo_envoi,(recu+13));
@@ -565,14 +576,17 @@ int main (int argc, char ** argv){
         strcpy(arg.pseudo_envoi,(recu+13));
         *(arg.pseudo_envoi+strlen(arg.pseudo_envoi)-1)='\0';
       }
+
+//hote deconnecte
       else if(strstr(recu,"/hostlost")!=NULL){
         arg.b=0;
-        printf("connexion interrompue: envoyez un message pour rafraichir puis choisissez un contact :\n");
+        printf("connexion interrompue\n");
         fflush(stdout);
         strcpy(liste,"");
         strcpy(co_part,liste);
-        break;
+        send(sock,"/connect all\n",15,0);
       }
+//Ack salon quitté
       else if(strncmp(recu,"/left ",6)==0){
         arg.b=0;
         printf("Salon quitté\n");
@@ -580,14 +594,15 @@ int main (int argc, char ** argv){
         char tmp[50];
         strcpy(tmp,recu+6);
         if (strstr(tmp,arg.pseudo_envoi)!=NULL){
-          printf("Entrer pour rafraichir\n");
-          fflush(stdout);
           strcpy(liste,"");
           strcpy(co_part,liste);
-          break;
+          send(sock,"/connect all\n",15,0);
+          printf("ENTRER pour rafraichir");
+          fflush(stdout);
         }
         arg.b=1;
       }
+//Ack nouvelle connexion
       else if(strncmp(recu,"/new_host",9)==0){
         printf("nouvelle connexion établie\n");
         char tmp[21];
@@ -597,6 +612,7 @@ int main (int argc, char ** argv){
         strcpy(arg.pseudo_envoi,tmp);
         arg.b=1;
       }
+//Acks d'echec
       else if(strncmp(recu,"/fail_new_host",14)==0){
         printf ("utilisateur introuvable\n");
         arg.b=1;
@@ -626,6 +642,8 @@ int main (int argc, char ** argv){
         fflush(stdout);
         arg.b=1;
       }
+
+//Proposition d'envoi de fichier
       else if((strncmp(recu,"/send ",6))==0){
         char name[21];
         char file[50];
@@ -646,7 +664,7 @@ int main (int argc, char ** argv){
             for (int i=j+1;i<k;i++){
               file[i-j-1]=recu[i+6];
             }
-            file[k-j-2]='\0';
+            file[k-j-1]='\0';
             printf("%s veut vous envoyer %s : /accept %s %s pour accepter\n",name,file,name,file);
             fflush(stdout);
           }
